@@ -1,0 +1,10 @@
+#Exclude Project Files
+.project
+*.adoc
+Cargo.lock
+
+#Exclude Build Files
+target
+target/**
+*/target
+*/target/**
