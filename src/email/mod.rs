@@ -12,7 +12,8 @@
 
 //use actix::dev::MessageResponse;
 use actix::prelude::*;
-//use actix::prelude::Context;
+//use actix::fut;
+use actix_web::web;
 
 use serde::{Deserialize, Serialize};
 
@@ -120,26 +121,28 @@ impl EmailLink {
         Self { addr }
     }
 
-    pub fn send_email(&self, email: EmailData) -> Box<dyn Future<Output = EmailResponse>> {
-        let fut = self.addr.send(email);
-            //.from_err::<EmailError>()
-            //.and_then(|x| x.map_err(EmailError::from));
-        Box::new(fut)
+    pub fn send_email<'ln>(&'ln self, email: EmailData) -> impl Future<Output = Result<EmailResponse, EmailError>> + 'ln {
+        let sender = &self.addr;
+        async move {
+          match sender.send(email).await {
+            Ok(rs) => rs ,
+            Err(e) => Err(EmailError {status: String::from("failed"), report: String::from(format!("Sending Error: '{:?}'", e))})
+          }
+
+
+        }
     }
 }
 
-pub async fn send_mail(email: EmailData) -> Result<EmailResponse, EmailError> {
-    // Start EmailSender Actor in current thread
-    let addr = EmailLink::start();
-
+pub async fn send_mail(link: web::Data<EmailLink>, email: EmailData) -> Result<EmailResponse, EmailError> {
     // Send Email Data message.
     // send() message returns Future object, that resolves to message result
-    let email_future = addr.send_email(email).await;
+    let email_future = link.send_email(email).await;
 
     match email_future {
       Ok(rs) => {
         println!("Email Result: '{:?}'", &rs);
-        rs
+        Ok(rs)
       }
       , Err(e) => {
         println!("Email Error: '{:?}'", &e);

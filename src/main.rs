@@ -21,7 +21,9 @@ extern crate json;
 mod email;
 mod ping;
 
-use actix_web::{error, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{error, web, App, Error, HttpResponse, HttpServer};
+use actix::Actor;
+use actix::sync::SyncArbiter;
 //use std::future::Future;
 //use futures_core::stream::Stream;
 use futures_util::stream::StreamExt;
@@ -33,7 +35,7 @@ use serde::{Deserialize, Serialize};
 
 use actix_web::middleware::Logger;
 
-use email::EmailData;
+use email::{EmailSender, EmailLink, EmailData};
 
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
@@ -83,7 +85,7 @@ async fn dispatch_home_page() -> HttpResponse {
 }
 
 /// This Handler reads the Request and parses it into EmailData object with serde
-async fn send_email(mut payload: web::Payload) -> Result<HttpResponse, Error> {
+async fn send_email(link: web::Data<EmailLink>, mut payload: web::Payload) -> Result<HttpResponse, Error> {
     // payload is a stream of Bytes objects
     let mut body = web::BytesMut::new();
     while let Some(chunk) = payload.next().await {
@@ -103,7 +105,7 @@ async fn send_email(mut payload: web::Payload) -> Result<HttpResponse, Error> {
       Ok(email) => {
         //Ok(HttpResponse::Ok().json(email)) // <- send response
 
-        match email::send_mail(email).await {
+        match email::send_mail(link, email).await {
           Ok(rs) => {
             println!("email res: '{:?}'", rs);
             Ok(HttpResponse::Ok().json(rs)) // <- send response
@@ -150,12 +152,19 @@ async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
 
-    println!("Launching Email App at 127.0.0.1:3100");
+    println!("Email App: launching at 127.0.0.1:3100 ...");
 
-    HttpServer::new(|| {
+    //Create 2 Email Sender Instances
+    let sender = SyncArbiter::start(2, || EmailSender);
+    //Create 1 Email Link Instance
+    let link = EmailLink::new(sender).start();
+
+
+    HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
-            .app_data(web::JsonConfig::default().limit(4096)) // <- limit size of the payload (global configuration)
+            .data(link.clone())
+            .data(web::JsonConfig::default().limit(4096)) // <- limit size of the payload (global configuration)
             .service(web::resource("/").route(web::get().to(dispatch_home_page)))
             .service(web::resource("/send").route(web::post().to(send_email)))
             .service(web::resource("/mjsonrust").route(web::post().to(index_mjsonrust)))
