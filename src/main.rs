@@ -4,7 +4,7 @@
 * @package Grafana Alerting
 * @subpackage Email Micro Service
 
-* This Module defines Classes to manage the Access to Files in persistent or instant Mode
+* This Module defines the HTTP Interface for accepting new Email Send Requests
 *
 *---------------------------------
 * Requirements:
@@ -15,15 +15,17 @@
 * - The Rust Crate "json" must be installed
 */
 
-#[macro_use]
+//#[macro_use]
 extern crate json;
 
-use actix_web::{
-    error, get, post, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+mod email;
+mod ping;
+
+use actix_web::{error, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 //use std::future::Future;
 //use futures_core::stream::Stream;
 use futures_util::stream::StreamExt;
-use mime;
+//use mime;
 
 //use futures::StreamExt;
 use json::JsonValue;
@@ -31,14 +33,22 @@ use serde::{Deserialize, Serialize};
 
 use actix_web::middleware::Logger;
 
+use email::EmailData;
+
+
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
+/*
+/// Structure for Incoming Data
 #[derive(Debug, Serialize, Deserialize)]
-struct EmailData {
+pub struct EmailData {
+    subject: String,
     from: String,
     to: String,
     message: String,
 }
+*/
+
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ResponseData {
@@ -72,8 +82,8 @@ async fn dispatch_home_page() -> HttpResponse {
     */
 }
 
-/// This handler manually load request payload and parse json object
-async fn index_manual(mut payload: web::Payload) -> Result<HttpResponse, Error> {
+/// This Handler reads the Request and parses it into EmailData object with serde
+async fn send_email(mut payload: web::Payload) -> Result<HttpResponse, Error> {
     // payload is a stream of Bytes objects
     let mut body = web::BytesMut::new();
     while let Some(chunk) = payload.next().await {
@@ -85,9 +95,31 @@ async fn index_manual(mut payload: web::Payload) -> Result<HttpResponse, Error> 
         body.extend_from_slice(&chunk);
     }
 
+    println!("got payload: '{:?}'", &body);
+
     // body is loaded, now we can deserialize serde-json
-    let obj = serde_json::from_slice::<EmailData>(&body)?;
-    Ok(HttpResponse::Ok().json(obj)) // <- send response
+
+    match serde_json::from_slice::<EmailData>(&body) {
+      Ok(email) => {
+        //Ok(HttpResponse::Ok().json(email)) // <- send response
+
+        match email::send_mail(email).await {
+          Ok(rs) => {
+            println!("email res: '{:?}'", rs);
+            Ok(HttpResponse::Ok().json(rs)) // <- send response
+          }
+          Err(e) => {
+            println!("email error: '{:?}'", e);
+            Err(error::ErrorBadRequest(format!("Sending failed: '{:?}'\n", e)))
+          }
+        }
+
+      }
+      Err(e) => {
+        println!("json error: '{:?}'", e);
+        Err(error::ErrorBadRequest(format!("Request invalid: '{}'\n", e.to_string())))
+      }
+    }
 }
 
 /// This handler manually load request payload and parse json-rust
@@ -103,6 +135,16 @@ async fn index_mjsonrust(body: web::Bytes) -> Result<HttpResponse, Error> {
         .body(injson.dump()))
 }
 
+async fn ping() -> Result<HttpResponse, Error> {
+  println!("Request 'Ping': processing ...");
+    ping::ping().await;
+
+    Ok(HttpResponse::Ok()
+        .content_type("application/json")
+        .body("{\"ping\":\"ok\"}"))
+
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
@@ -115,8 +157,9 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .app_data(web::JsonConfig::default().limit(4096)) // <- limit size of the payload (global configuration)
             .service(web::resource("/").route(web::get().to(dispatch_home_page)))
-            .service(web::resource("/manual").route(web::post().to(index_manual)))
+            .service(web::resource("/send").route(web::post().to(send_email)))
             .service(web::resource("/mjsonrust").route(web::post().to(index_mjsonrust)))
+            .service(web::resource("/ping").route(web::get().to(ping)))
     })
     .bind("127.0.0.1:3100")?
     .run()
