@@ -14,9 +14,8 @@
 use actix::prelude::*;
 //use actix::fut;
 use actix_web::web;
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-
+use std::sync::Arc;
 
 /// Structure for Incoming Data
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,7 +45,6 @@ impl Message for EmailData {
     type Result = Result<EmailResponse, EmailError>;
 }
 
-
 /*
 impl<A, M> MessageResponse<A, M> for EmailResponse
 where
@@ -60,7 +58,6 @@ where
     }
 }
 */
-
 
 // Define actor
 pub struct EmailSender;
@@ -94,7 +91,10 @@ impl Handler<EmailData> for EmailSender {
         println!("Email Result: '{:?}'", &mail);
 
         //MessageResult(EmailResponse {status: String::from("sent"), report: String::from("")})
-        Ok(EmailResponse {status: String::from("sent"), report: String::from("")})
+        Ok(EmailResponse {
+            status: String::from("sent"),
+            report: String::from(""),
+        })
     }
 }
 
@@ -121,32 +121,39 @@ impl EmailLink {
         Self { addr }
     }
 
-    pub fn send_email(&self, email: EmailData) -> impl Future<Output = Result<EmailResponse, EmailError>> + 'static {
+    pub fn send_email(
+        &self,
+        email: EmailData,
+    ) -> impl Future<Output = Result<EmailResponse, EmailError>> + 'static {
         let sender = self.addr.clone();
         async move {
-          match sender.send(email).await {
-            Ok(rs) => rs ,
-            Err(e) => Err(EmailError {status: String::from("failed"), report: String::from(format!("Sending Error: '{:?}'", e))})
-          }
-
-
+            match sender.send(email).await {
+                Ok(rs) => rs,
+                Err(e) => Err(EmailError {
+                    status: String::from("failed"),
+                    report: String::from(format!("Sending Error: '{:?}'", e)),
+                }),
+            }
         }
     }
 }
 
-pub async fn send_mail(link: web::Data<Arc<EmailLink>>, email: EmailData) -> Result<EmailResponse, EmailError> {
+pub async fn send_mail(
+    link: web::Data<Arc<EmailLink>>,
+    email: EmailData,
+) -> Result<EmailResponse, EmailError> {
     // Send Email Data message.
     // send() message returns Future object, that resolves to message result
     let email_future = link.send_email(email).await;
 
     match email_future {
-      Ok(rs) => {
-        println!("Email Result: '{:?}'", &rs);
-        Ok(rs)
-      }
-      , Err(e) => {
-        println!("Email Error: '{:?}'", &e);
-        Err(e)
-      }
+        Ok(rs) => {
+            println!("Email Result: '{:?}'", &rs);
+            Ok(rs)
+        }
+        Err(e) => {
+            println!("Email Error: '{:?}'", &e);
+            Err(e)
+        }
     }
 }

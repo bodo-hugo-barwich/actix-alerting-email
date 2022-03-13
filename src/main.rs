@@ -21,9 +21,9 @@ extern crate json;
 mod email;
 mod ping;
 
-use actix_web::{error, web, App, Error, HttpResponse, HttpServer};
-use actix::Actor;
 use actix::sync::SyncArbiter;
+use actix::Actor;
+use actix_web::{error, web, App, Error, HttpResponse, HttpServer};
 //use std::future::Future;
 //use futures_core::stream::Stream;
 use futures_util::stream::StreamExt;
@@ -36,8 +36,7 @@ use serde::{Deserialize, Serialize};
 
 use actix_web::middleware::Logger;
 
-use email::{EmailSender, EmailLink, EmailData};
-
+use email::{EmailData, EmailLink, EmailSender};
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
@@ -51,7 +50,6 @@ pub struct EmailData {
     message: String,
 }
 */
-
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ResponseData {
@@ -86,7 +84,10 @@ async fn dispatch_home_page() -> HttpResponse {
 }
 
 /// This Handler reads the Request and parses it into EmailData object with serde
-async fn send_email(link: web::Data<Arc<EmailLink>>, mut payload: web::Payload) -> Result<HttpResponse, Error> {
+async fn send_email(
+    link: web::Data<Arc<EmailLink>>,
+    mut payload: web::Payload,
+) -> Result<HttpResponse, Error> {
     // payload is a stream of Bytes objects
     let mut body = web::BytesMut::new();
     while let Some(chunk) = payload.next().await {
@@ -103,28 +104,34 @@ async fn send_email(link: web::Data<Arc<EmailLink>>, mut payload: web::Payload) 
     // body is loaded, now we can deserialize serde-json
 
     match serde_json::from_slice::<EmailData>(&body) {
-      Ok(email) => {
-        //Ok(HttpResponse::Ok().json(email)) // <- send response
-        //match link_mutex.lock() {
-          //Ok(link_lock) => {
+        Ok(email) => {
+            //Ok(HttpResponse::Ok().json(email)) // <- send response
+            //match link_mutex.lock() {
+            //Ok(link_lock) => {
             match email::send_mail(link, email).await {
-              Ok(rs) => {
-                println!("email res: '{:?}'", rs);
-                Ok(HttpResponse::Ok().json(rs)) // <- send response
-              }
-              Err(e) => {
-                println!("email error: '{:?}'", e);
-                Err(error::ErrorBadRequest(format!("Sending failed: '{:?}'\n", e)))
-              }
+                Ok(rs) => {
+                    println!("email res: '{:?}'", rs);
+                    Ok(HttpResponse::Ok().json(rs)) // <- send response
+                }
+                Err(e) => {
+                    println!("email error: '{:?}'", e);
+                    Err(error::ErrorBadRequest(format!(
+                        "Sending failed: '{:?}'\n",
+                        e
+                    )))
+                }
             }
-          //}
-          //, Err(_e) => {Err(error::InternalError{cause: "email link lock failed", status: 500})}
-        //}
-      }
-      Err(e) => {
-        println!("json error: '{:?}'", e);
-        Err(error::ErrorBadRequest(format!("Request invalid: '{}'\n", e.to_string())))
-      }
+            //}
+            //, Err(_e) => {Err(error::InternalError{cause: "email link lock failed", status: 500})}
+            //}
+        }
+        Err(e) => {
+            println!("json error: '{:?}'", e);
+            Err(error::ErrorBadRequest(format!(
+                "Request invalid: '{}'\n",
+                e.to_string()
+            )))
+        }
     }
 }
 
@@ -142,13 +149,12 @@ async fn index_mjsonrust(body: web::Bytes) -> Result<HttpResponse, Error> {
 }
 
 async fn ping() -> Result<HttpResponse, Error> {
-  println!("Request 'Ping': processing ...");
+    println!("Request 'Ping': processing ...");
     ping::ping().await;
 
     Ok(HttpResponse::Ok()
         .content_type("application/json")
         .body("{\"ping\":\"ok\"}"))
-
 }
 
 #[actix_web::main]
@@ -158,25 +164,24 @@ async fn main() -> std::io::Result<()> {
 
     println!("Email App: launching at 127.0.0.1:3100 ...");
 
-      //Create 2 Email Sender Instances
-      let sender = SyncArbiter::start(2, || EmailSender);
-      //Create 1 Email Link Instance
-      let link = Arc::new(EmailLink::new(sender).start());
+    //Create 2 Email Sender Instances
+    let sender = SyncArbiter::start(2, || EmailSender);
+    //Create 1 Email Link Instance
+    let link = Arc::new(EmailLink::new(sender).start());
 
-//    let link_mutex = web::Data::new(Mutex::new(link));
-
+    //    let link_mutex = web::Data::new(Mutex::new(link));
 
     HttpServer::new(move || {
-        let link = link.clone();
+        let link_data = web::Data::new(link.clone());
 
         App::new()
-            .wrap(Logger::default())
-            .app_data(link)
+            .app_data(link_data)
             .app_data(web::JsonConfig::default().limit(4096)) // <- limit size of the payload (global configuration)
             .service(web::resource("/").route(web::get().to(dispatch_home_page)))
             .service(web::resource("/send").route(web::post().to(send_email)))
             .service(web::resource("/mjsonrust").route(web::post().to(index_mjsonrust)))
             .service(web::resource("/ping").route(web::get().to(ping)))
+            .wrap(Logger::default())
     })
     .bind("127.0.0.1:3100")?
     .run()
