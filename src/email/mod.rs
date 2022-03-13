@@ -10,28 +10,25 @@
 * Requirements:
 */
 
-//use actix::dev::MessageResponse;
 use actix::prelude::*;
-//use actix::fut;
-use actix_web::web;
+use actix::Addr;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Structure for Incoming Data
 #[derive(Debug, Serialize, Deserialize)]
 //#[rtype(result = "Result<EmailResponse, EmailError>")]
 pub struct EmailData {
-    subject: String,
-    from: String,
-    to: String,
-    message: String,
+    pub subject: String,
+    pub from: String,
+    pub to: String,
+    pub message: String,
 }
 
 /// Structure for Email Sending Results
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EmailResponse {
-    status: String,
-    report: String,
+    pub status: String,
+    pub report: String,
 }
 
 /// Structure for Email Sending Errors
@@ -81,19 +78,19 @@ impl Actor for EmailSender {
     }
 }
 
-/// Define handler for `Messages` enum
+/// Define handler for `EmailData` structure
 impl Handler<EmailData> for EmailSender {
     //type Result = MessageResult<EmailData>;
     //type Result = ResponseActFuture<Self, Result<EmailResponse, EmailError>>;
     type Result = Result<EmailResponse, EmailError>;
 
     fn handle(&mut self, mail: EmailData, _ctx: &mut Self::Context) -> Self::Result {
-        println!("Email Result: '{:?}'", &mail);
+        println!("Email Data: '{:?}'", &mail);
 
         //MessageResult(EmailResponse {status: String::from("sent"), report: String::from("")})
         Ok(EmailResponse {
             status: String::from("sent"),
-            report: String::from(""),
+            report: String::from("Email was sent"),
         })
     }
 }
@@ -101,19 +98,6 @@ impl Handler<EmailData> for EmailSender {
 #[derive(Clone)]
 pub struct EmailLink {
     addr: Addr<EmailSender>,
-}
-
-// Provide Actor implementation for EmailSender
-impl Actor for EmailLink {
-    type Context = Context<Self>;
-
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        println!("Email Link Actor is alive");
-    }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        println!("Email Link Actor is stopped");
-    }
 }
 
 impl EmailLink {
@@ -131,17 +115,14 @@ impl EmailLink {
                 Ok(rs) => rs,
                 Err(e) => Err(EmailError {
                     status: String::from("failed"),
-                    report: String::from(format!("Sending Error: '{:?}'", e)),
+                    report: format!("Sending Error: '{:?}'", e),
                 }),
             }
         }
     }
 }
 
-pub async fn send_mail(
-    link: web::Data<Arc<EmailLink>>,
-    email: EmailData,
-) -> Result<EmailResponse, EmailError> {
+pub async fn send_mail(link: &EmailLink, email: EmailData) -> Result<EmailResponse, EmailError> {
     // Send Email Data message.
     // send() message returns Future object, that resolves to message result
     let email_future = link.send_email(email).await;
