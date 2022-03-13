@@ -21,7 +21,7 @@ where
 {
     fn handle<R: ResponseChannel<M>>(self, _: &mut A::Context, tx: Option<R>) {
         if let Some(tx) = tx {
-          tx.send(self);
+            tx.send(self);
         }
     }
 }
@@ -85,4 +85,3 @@ pub async fn ping() {
         Err(e) => println!("Actor is probably dead: {}", e),
     }
 }
-
