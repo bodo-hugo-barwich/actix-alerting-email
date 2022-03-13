@@ -14,7 +14,7 @@
 use actix::prelude::*;
 //use actix::fut;
 use actix_web::web;
-
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 
@@ -121,8 +121,8 @@ impl EmailLink {
         Self { addr }
     }
 
-    pub fn send_email<'ln>(&'ln self, email: EmailData) -> impl Future<Output = Result<EmailResponse, EmailError>> + 'ln {
-        let sender = &self.addr;
+    pub fn send_email(&self, email: EmailData) -> impl Future<Output = Result<EmailResponse, EmailError>> + 'static {
+        let sender = self.addr.clone();
         async move {
           match sender.send(email).await {
             Ok(rs) => rs ,
@@ -134,7 +134,7 @@ impl EmailLink {
     }
 }
 
-pub async fn send_mail(link: web::Data<EmailLink>, email: EmailData) -> Result<EmailResponse, EmailError> {
+pub async fn send_mail(link: web::Data<Arc<EmailLink>>, email: EmailData) -> Result<EmailResponse, EmailError> {
     // Send Email Data message.
     // send() message returns Future object, that resolves to message result
     let email_future = link.send_email(email).await;
