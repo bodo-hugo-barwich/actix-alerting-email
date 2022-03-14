@@ -1,3 +1,5 @@
+[![Automated Actix Tests](https://github.com/bodo-hugo-barwich/actix-alerting-email/actions/workflows/testing.yml/badge.svg)](https://github.com/bodo-hugo-barwich/actix-alerting-email/actions/workflows/testing.yml)
+
 # NAME
 
 Email Alerting Micro Service Component
