@@ -39,6 +39,7 @@ mod tests {
                 .route("/send", web::post().to(send_email)),
         )
         .await;
+
         let email = EmailData {
             subject: String::from("my test subject"),
             from: String::from("sender@testmail.com"),
