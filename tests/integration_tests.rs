@@ -3,7 +3,7 @@ mod tests {
     use actix::sync::SyncArbiter;
     use actix_web::{http::header::ContentType, test, web, App};
 
-    use alerting_email::email::{EmailData, EmailLink, EmailResponse, EmailSender};
+    use alerting_email::email::{EmailData, EmailLink, EmailResponse, EmailSender, SMTPConfig};
     use alerting_email::{dispatch_home_page, send_email, ResponseData};
 
     #[actix_rt::test]
@@ -31,7 +31,7 @@ mod tests {
         //Create 2 Email Sender Instances
         let sender = SyncArbiter::start(2, || EmailSender);
         //Create 1 Email Link Object
-        let link = EmailLink::new(sender);
+        let link = EmailLink::new(sender, SMTPConfig::default());
 
         let mut app = test::init_service(
             App::new()

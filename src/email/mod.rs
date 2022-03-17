@@ -12,7 +12,20 @@
 
 use actix::prelude::*;
 use actix::Addr;
+use lettre::smtp::{SmtpClient, extension::ClientId};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+/// Structure for Incoming Data
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct SMTPConfig {
+    pub host: String,
+    pub port: Option<u16>,
+    pub hello: String,
+    pub username: String,
+    pub password: String,
+    pub timeout: Option<u16>
+}
 
 /// Structure for Incoming Data
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,6 +35,12 @@ pub struct EmailData {
     pub from: String,
     pub to: String,
     pub message: String,
+}
+
+#[derive(Debug)]
+struct EmailRequest {
+  config: SMTPConfig,
+  data: EmailData,
 }
 
 /// Structure for Email Sending Results
@@ -38,7 +57,7 @@ pub struct EmailError {
     report: String,
 }
 
-impl Message for EmailData {
+impl Message for EmailRequest {
     type Result = Result<EmailResponse, EmailError>;
 }
 
@@ -59,11 +78,25 @@ where
 // Define actor
 pub struct EmailSender;
 
-/* -> EmailSender::Result
-impl Message for EmailSender {
-    type Result = Result<EmailResponse, EmailError>;
+impl EmailSender {
+    fn connect(config: &SMTPConfig) -> Result<SmtpClient, EmailError> {
+        let client_name = if ! config.hello.is_empty() {
+          ClientId::new(String::from(config.hello.as_str()))
+        } else {
+          ClientId::new(String::from("localhost"))
+        };
+        let timeout_secs = Duration::from_secs(config.timeout.unwrap_or(15) as u64);
+
+            match SmtpClient::new_simple(&config.host) {
+              Ok(cln) => {
+                Ok(cln.hello_name(client_name).timeout(Some(timeout_secs)))
+              }
+              , Err(e) => Err(
+                  EmailError {status: String::from("failed"), report: format!("SMTP Connection failed: '{}'", e) }
+                )
+            } //match SmtpClient::new_simple(&cfg.host)
+    }
 }
-*/
 
 // Provide Actor implementation for EmailSender
 impl Actor for EmailSender {
@@ -78,31 +111,40 @@ impl Actor for EmailSender {
     }
 }
 
-/// Define handler for `EmailData` structure
-impl Handler<EmailData> for EmailSender {
+/// Define handler for `EmailRequest` structure
+impl Handler<EmailRequest> for EmailSender {
     //type Result = MessageResult<EmailData>;
     //type Result = ResponseActFuture<Self, Result<EmailResponse, EmailError>>;
     type Result = Result<EmailResponse, EmailError>;
 
-    fn handle(&mut self, mail: EmailData, _ctx: &mut Self::Context) -> Self::Result {
-        println!("Email Data: '{:?}'", &mail);
+    fn handle(&mut self, mail_request: EmailRequest, _ctx: &mut Self::Context) -> Self::Result {
+        println!("Email Data: '{:?}'", &mail_request);
 
-        //MessageResult(EmailResponse {status: String::from("sent"), report: String::from("")})
-        Ok(EmailResponse {
-            status: String::from("sent"),
-            report: String::from("Email was sent"),
-        })
+        let conn_rs = EmailSender::connect(&mail_request.config);
+
+        match conn_rs {
+          Ok(conn) => {
+            Ok(EmailResponse {
+              status: String::from("sent"),
+              report: String::from("Email was sent"),
+          })
+          }
+          , Err(e) => {
+            Err(e)
+          }
+        } //match conn_future
     }
 }
 
 #[derive(Clone)]
 pub struct EmailLink {
     addr: Addr<EmailSender>,
+    config: SMTPConfig
 }
 
 impl EmailLink {
-    pub fn new(addr: Addr<EmailSender>) -> Self {
-        Self { addr }
+    pub fn new(addr: Addr<EmailSender>, config: SMTPConfig) -> Self {
+        Self { addr, config }
     }
 
     pub fn send_email(
@@ -110,8 +152,9 @@ impl EmailLink {
         email: EmailData,
     ) -> impl Future<Output = Result<EmailResponse, EmailError>> + 'static {
         let sender = self.addr.clone();
+        let request = EmailRequest {config: self.config.clone(), data: email };
         async move {
-            match sender.send(email).await {
+            match sender.send(request).await {
                 Ok(rs) => rs,
                 Err(e) => Err(EmailError {
                     status: String::from("failed"),

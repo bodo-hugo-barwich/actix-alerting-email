@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 
 use actix_web::middleware::Logger;
 
-use email::{EmailData, EmailLink, EmailSender};
+use email::{EmailData, EmailLink, EmailSender, SMTPConfig};
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
@@ -162,7 +162,7 @@ pub async fn main() -> std::io::Result<()> {
     //Create 2 Email Sender Instances
     let sender = SyncArbiter::start(2, || EmailSender);
     //Create 1 Email Link Object
-    let link = EmailLink::new(sender);
+    let link = EmailLink::new(sender, SMTPConfig::default());
 
     HttpServer::new(move || {
         let link_data = web::Data::new(link.clone());

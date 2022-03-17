@@ -69,7 +69,7 @@ pub async fn ping() {
 
     println!("pong res: {:?}", pong_future);
 
-    match pong_future {
+    match ping_future {
         Ok(res) => match res {
             Responses::GotPing => println!("Ping received"),
             Responses::GotPong => println!("Pong received"),
@@ -77,7 +77,7 @@ pub async fn ping() {
         Err(e) => println!("Actor is probably dead: {}", e),
     }
 
-    match ping_future {
+    match pong_future {
         Ok(res) => match res {
             Responses::GotPing => println!("Ping received"),
             Responses::GotPong => println!("Pong received"),
