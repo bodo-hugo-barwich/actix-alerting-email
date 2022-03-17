@@ -27,6 +27,26 @@ mod tests {
     }
 
     #[actix_rt::test]
+    async fn test_ping() {
+        let mut app =
+            test::init_service(App::new().route("/", web::get().to(dispatch_home_page))).await;
+        let req = test::TestRequest::with_header("content-type", ContentType::json()).to_request();
+
+        let resp = test::call_service(&mut app, req).await;
+
+        println!("ping hdrs: '{:?}'", resp);
+
+        assert!(resp.status().is_success());
+
+        let response: ResponseData = test::read_body_json(resp).await;
+
+        println!("send bdy: '{:?}'", response);
+
+        assert_eq!(response.page.as_str(), "Ping");
+        assert_eq!(response.statuscode, 200);
+    }
+
+    #[actix_rt::test]
     async fn test_send() {
         //Create 2 Email Sender Instances
         let sender = SyncArbiter::start(2, || EmailSender);
