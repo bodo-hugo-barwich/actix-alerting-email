@@ -145,11 +145,21 @@ async fn index_mjsonrust(body: web::Bytes) -> Result<HttpResponse, Error> {
 
 async fn ping() -> Result<HttpResponse, Error> {
     println!("Request 'Ping': processing ...");
-    ping::ping().await;
+    let ping_rs = ping::ping().await;
 
-    Ok(HttpResponse::Ok()
-        .content_type("application/json")
-        .body("{\"ping\":\"ok\"}"))
+    match ping_rs {
+        Ok(resp) => Ok(HttpResponse::Ok().json(ResponseData {
+            title: String::from("Ping Request"),
+            statuscode: 200,
+            page: String::from("Ping"),
+            description: format!("Ping Request [ OK ]; Message: '{}'", resp),
+        })),
+
+        Err(e) => {
+            println!("ping error: '{:?}'", e);
+            Err(error::ErrorBadRequest(format!("Request failed: '{}'\n", e)))
+        }
+    }
 }
 
 #[actix_web::main]
