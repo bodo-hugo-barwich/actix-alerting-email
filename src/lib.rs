@@ -143,7 +143,7 @@ async fn index_mjsonrust(body: web::Bytes) -> Result<HttpResponse, Error> {
         .body(injson.dump()))
 }
 
-async fn ping() -> Result<HttpResponse, Error> {
+pub async fn dispatch_ping_request() -> Result<HttpResponse, Error> {
     println!("Request 'Ping': processing ...");
     let ping_rs = ping::ping().await;
 
@@ -183,7 +183,7 @@ pub async fn main() -> std::io::Result<()> {
             .service(web::resource("/").route(web::get().to(dispatch_home_page)))
             .service(web::resource("/send").route(web::post().to(send_email)))
             .service(web::resource("/mjsonrust").route(web::post().to(index_mjsonrust)))
-            .service(web::resource("/ping").route(web::get().to(ping)))
+            .service(web::resource("/ping").route(web::get().to(dispatch_ping_request)))
             .wrap(Logger::default())
     })
     .bind("127.0.0.1:3100")?
