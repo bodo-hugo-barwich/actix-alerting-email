@@ -4,7 +4,7 @@ mod tests {
     use actix_web::{http::header::ContentType, test, web, App};
 
     use alerting_email::email::{EmailData, EmailLink, EmailResponse, EmailSender};
-    use alerting_email::{dispatch_home_page, send_email, ResponseData};
+    use alerting_email::{dispatch_home_page, dispatch_ping_request, send_email, ResponseData};
 
     #[actix_rt::test]
     async fn test_home() {
@@ -23,6 +23,29 @@ mod tests {
         println!("send bdy: '{:?}'", response);
 
         assert_eq!(response.page.as_str(), "Home");
+        assert_eq!(response.statuscode, 200);
+    }
+
+    #[actix_rt::test]
+    async fn test_ping() {
+        let mut app =
+            test::init_service(App::new().route("/ping", web::get().to(dispatch_ping_request)))
+                .await;
+        let req = test::TestRequest::with_header("content-type", ContentType::json())
+            .uri("/ping")
+            .to_request();
+
+        let resp = test::call_service(&mut app, req).await;
+
+        println!("ping hdrs: '{:?}'", resp);
+
+        assert!(resp.status().is_success());
+
+        let response: ResponseData = test::read_body_json(resp).await;
+
+        println!("send bdy: '{:?}'", response);
+
+        assert_eq!(response.page.as_str(), "Ping");
         assert_eq!(response.statuscode, 200);
     }
 
