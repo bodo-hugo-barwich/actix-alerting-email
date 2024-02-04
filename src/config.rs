@@ -14,6 +14,7 @@ extern crate serde;
 extern crate serde_yaml;
 
 use serde_derive::{Deserialize, Serialize};
+use std::fmt;
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{Error, ErrorKind};
@@ -25,7 +26,7 @@ const CONFIG_FILE: &'static str = ".env";
 // Structure SMTPConfig Declaration
 
 /// Structure for the SMTP Configuration
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SMTPConfig {
     pub host: String,
     pub port: String,
@@ -82,7 +83,7 @@ impl SMTPConfig {
 
 impl Clone for SMTPConfig {
     /*----------------------------------------------------------------------------
-     * Administrative Methods
+     * Administration Methods
      */
 
     fn clone(&self) -> SMTPConfig {
@@ -96,6 +97,24 @@ impl Clone for SMTPConfig {
         }
     }
 }
+
+impl fmt::Debug for SMTPConfig {
+    /*----------------------------------------------------------------------------
+     * Consultation Methods
+     */
+
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SMTPConfig")
+         .field("host", &self.host)
+         .field("port", &self.port)
+         .field("login", &self.login)
+         .field("password", &"******")
+         .field("full_name", &self.full_name)
+         .field("email_address", &self.email_address)
+         .finish()
+    }
+}
+
 
 //==============================================================================
 // Structure AppConfig Implementation
