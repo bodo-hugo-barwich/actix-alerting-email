@@ -14,8 +14,8 @@ extern crate serde;
 extern crate serde_yaml;
 
 use serde_derive::{Deserialize, Serialize};
-use std::fmt;
 use std::ffi::OsStr;
+use std::fmt;
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
@@ -33,7 +33,7 @@ pub struct SMTPConfig {
     pub login: String,
     pub password: String,
     pub full_name: String,
-    pub email_address: String
+    pub email_address: String,
 }
 
 //==============================================================================
@@ -76,7 +76,7 @@ impl SMTPConfig {
             login: String::new(),
             password: String::new(),
             full_name: String::new(),
-            email_address: String::new()
+            email_address: String::new(),
         }
     }
 }
@@ -93,7 +93,7 @@ impl Clone for SMTPConfig {
             login: self.login.clone(),
             password: self.password.clone(),
             full_name: self.full_name.clone(),
-            email_address: self.email_address.clone()
+            email_address: self.email_address.clone(),
         }
     }
 }
@@ -105,16 +105,15 @@ impl fmt::Debug for SMTPConfig {
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SMTPConfig")
-         .field("host", &self.host)
-         .field("port", &self.port)
-         .field("login", &self.login)
-         .field("password", &"******")
-         .field("full_name", &self.full_name)
-         .field("email_address", &self.email_address)
-         .finish()
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("login", &self.login)
+            .field("password", &"******")
+            .field("full_name", &self.full_name)
+            .field("email_address", &self.email_address)
+            .finish()
     }
 }
-
 
 //==============================================================================
 // Structure AppConfig Implementation

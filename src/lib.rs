@@ -203,7 +203,7 @@ pub async fn main() -> std::io::Result<()> {
     //Create 2 Email Sender Instances
     let sender = SyncArbiter::start(config.mail_worker as usize, move || {
         EmailSender::from_config(&smtp_config)
-     });
+    });
     //Create 1 Email Link Object
     let link = EmailLink::new(sender);
 
@@ -214,10 +214,22 @@ pub async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(link_data)
             .app_data(web::JsonConfig::default().limit(MAX_SIZE)) // <- limit size of the payload (global configuration)
-            .service(web::resource(app_config.web_root.as_str()).route(web::get().to(dispatch_home_page)))
-            .service(web::resource(app_config.web_root.as_str().to_owned() + "send").route(web::post().to(send_email)))
-            .service(web::resource(app_config.web_root.as_str().to_owned() + "mjsonrust").route(web::post().to(index_mjsonrust)))
-            .service(web::resource(app_config.web_root.as_str().to_owned() + "ping").route(web::get().to(dispatch_ping_request)))
+            .service(
+                web::resource(app_config.web_root.as_str())
+                    .route(web::get().to(dispatch_home_page)),
+            )
+            .service(
+                web::resource(app_config.web_root.as_str().to_owned() + "send")
+                    .route(web::post().to(send_email)),
+            )
+            .service(
+                web::resource(app_config.web_root.as_str().to_owned() + "mjsonrust")
+                    .route(web::post().to(index_mjsonrust)),
+            )
+            .service(
+                web::resource(app_config.web_root.as_str().to_owned() + "ping")
+                    .route(web::get().to(dispatch_ping_request)),
+            )
             .app_data(app_config)
             .wrap(Logger::default())
     })

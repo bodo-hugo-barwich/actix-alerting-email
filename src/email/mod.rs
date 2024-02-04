@@ -67,9 +67,8 @@ impl Message for EmailData {
 /// Structure for the Email Sending
 // Define actor
 pub struct EmailSender {
-  config: SMTPConfig
+    config: SMTPConfig,
 }
-
 
 //==============================================================================
 // Structure EmailSender Implementation
@@ -156,9 +155,15 @@ impl Handler<EmailData> for EmailSender {
                 let email = EmailBuilder::new()
                     // Addresses can be specified by the tuple (email, alias)
                     // ... or by an address only
-                    .from((self.config.email_address.as_str(), self.config.full_name.as_str()))
+                    .from((
+                        self.config.email_address.as_str(),
+                        self.config.full_name.as_str(),
+                    ))
                     .header(Header::new("X-Forward-From".to_owned(), mail.from.clone()))
-                    .to((self.config.email_address.as_str(), self.config.full_name.as_str()))
+                    .to((
+                        self.config.email_address.as_str(),
+                        self.config.full_name.as_str(),
+                    ))
                     .subject(mail.subject.as_str())
                     .text(mail.message.as_str())
                     .build()

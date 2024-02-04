@@ -3,6 +3,7 @@ mod tests {
     use actix::sync::SyncArbiter;
     use actix_web::{http::header::ContentType, test, web, App};
 
+    use alerting_email::config::AppConfig;
     use alerting_email::email::{EmailData, EmailLink, EmailResponse, EmailSender};
     use alerting_email::{dispatch_home_page, dispatch_ping_request, send_email, ResponseData};
 
@@ -51,8 +52,12 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_send() {
+        let config = AppConfig::from_file();
+
+        println!("app config: {:?}", config);
+
         //Create 2 Email Sender Instances
-        let sender = SyncArbiter::start(2, || EmailSender);
+        let sender = SyncArbiter::start(1, move || EmailSender::from_config(&config.smtp));
         //Create 1 Email Link Object
         let link = EmailLink::new(sender);
 
@@ -64,10 +69,10 @@ mod tests {
         .await;
 
         let email = EmailData {
-            subject: String::from("my test subject"),
+            subject: String::from("[Mail Test] my test subject"),
             from: String::from("sender@testmail.com"),
             to: String::from("receiver@testmail.com"),
-            message: String::from("my test email message"),
+            message: String::from("Mail Test\n===============\n\nmy test email message"),
         };
         let req = test::TestRequest::post()
             .uri("/send")
