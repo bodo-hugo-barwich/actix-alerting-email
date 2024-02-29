@@ -78,7 +78,7 @@ mod tests {
             to: String::from("receiver@testmail.com"),
             message: String::from("Mail Test - ")
                 + config.component.as_str()
-                + "\n===============\n\nmy test email message",
+                + "\n=============================\n\nmy test email message",
         };
         let req = test::TestRequest::post()
             .uri("/send")
