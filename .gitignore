@@ -11,3 +11,6 @@ target
 target/**
 */target
 */target/**
+
+#Exclude Node Modules
+**/node_modules/**
