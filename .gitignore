@@ -3,8 +3,14 @@
 *.adoc
 Cargo.lock
 
+#Exclude Local Configurations
+.env
+
 #Exclude Build Files
 target
 target/**
 */target
 */target/**
+
+#Exclude Node Modules
+**/node_modules/**

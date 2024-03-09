@@ -1,6 +1,6 @@
 /*
 * @author Bodo (Hugo) Barwich
-* @version 2022-03-13
+* @version 2024-02-04
 * @package Grafana Alerting
 * @subpackage Email Micro Service
 
@@ -18,8 +18,11 @@
 //#[macro_use]
 extern crate json;
 
+pub mod config;
 pub mod email;
 pub mod ping;
+
+use std::env;
 
 use actix::sync::SyncArbiter;
 use actix_web::{error, web, App, Error, HttpResponse, HttpServer};
@@ -31,6 +34,7 @@ use serde::{Deserialize, Serialize};
 
 use actix_web::middleware::Logger;
 
+use config::AppConfig;
 use email::{EmailData, EmailLink, EmailSender};
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
@@ -60,7 +64,7 @@ pub async fn dispatch_home_page() -> HttpResponse {
     //Project Description
 
     HttpResponse::Ok().json(ResponseData {
-        title: String::from("Grafana Alerting Email"),
+        title: String::from("Actix Alerting Email"),
         statuscode: 200,
         page: String::from("Home"),
         description: String::from("Email Sending Micro Service for the Grafana Alerting Project"),
@@ -162,35 +166,78 @@ pub async fn dispatch_ping_request() -> Result<HttpResponse, Error> {
     }
 }
 
+//==============================================================================
+// Executing Section
+
 #[actix_web::main]
 pub async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
 
-    println!("Email App: launching at 127.0.0.1:3100 ...");
+    let config = AppConfig::from_file();
+
+    println!("app config: {:?}", config);
+
+    let component_name = match env::var("COMPONENT") {
+        Ok(comp) => comp,
+        Err(_) => "default".to_owned(),
+    };
+
+    let mut app_host = String::from("127.0.0.1");
+    let app_port = match env::var("PORT") {
+        Ok(p) => p,
+        Err(_) => "3100".to_owned(),
+    };
+
+    app_host.push(':');
+    app_host.push_str(app_port.as_str());
+
+    println!(
+        "Email App '{}': launching at {} ...",
+        component_name, app_host
+    );
+
+    //Clone the SMTP Config for the Email Worker
+    let smtp_config = config.smtp.clone();
 
     //Create 2 Email Sender Instances
-    let sender = SyncArbiter::start(2, || EmailSender);
+    let sender = SyncArbiter::start(config.mail_worker as usize, move || {
+        EmailSender::from_config(&smtp_config)
+    });
     //Create 1 Email Link Object
     let link = EmailLink::new(sender);
 
     HttpServer::new(move || {
+        let app_config = web::Data::new(config.clone());
         let link_data = web::Data::new(link.clone());
 
         App::new()
             .app_data(link_data)
-            .app_data(web::JsonConfig::default().limit(4096)) // <- limit size of the payload (global configuration)
-            .service(web::resource("/").route(web::get().to(dispatch_home_page)))
-            .service(web::resource("/send").route(web::post().to(send_email)))
-            .service(web::resource("/mjsonrust").route(web::post().to(index_mjsonrust)))
-            .service(web::resource("/ping").route(web::get().to(dispatch_ping_request)))
+            .app_data(web::JsonConfig::default().limit(MAX_SIZE)) // <- limit size of the payload (global configuration)
+            .service(
+                web::resource(app_config.web_root.as_str())
+                    .route(web::get().to(dispatch_home_page)),
+            )
+            .service(
+                web::resource(app_config.web_root.as_str().to_owned() + "send")
+                    .route(web::post().to(send_email)),
+            )
+            .service(
+                web::resource(app_config.web_root.as_str().to_owned() + "mjsonrust")
+                    .route(web::post().to(index_mjsonrust)),
+            )
+            .service(
+                web::resource(app_config.web_root.as_str().to_owned() + "ping")
+                    .route(web::get().to(dispatch_ping_request)),
+            )
+            .app_data(app_config)
             .wrap(Logger::default())
     })
-    .bind("127.0.0.1:3100")?
+    .bind(app_host)?
     .run()
     .await?;
 
-    println!("Email App: finished.");
+    println!("Email App '{}': finished.", component_name);
 
     Ok(())
 }
